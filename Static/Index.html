@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Small Biz Finances</title>
+  <style>
+    body { font-family: sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+    input, select, button { padding: 0.5rem; margin: 0.5rem 0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    th, td { border: 1px solid #ccc; padding: 0.5rem; text-align: left; }
+  </style>
+</head>
+<body>
+  <h1>🤖 Robot Penghitung Keuangan</h1>
+
+  <h2>Tambah Transaksi</h2>
+  <form id="transactionForm">
+    <select id="type" required>
+      <option value="income">Pendapatan</option>
+      <option value="expense">Pengeluaran</option>
+    </select>
+    <input type="number" step="0.01" id="amount" placeholder="Jumlah" required />
+    <input type="text" id="description" placeholder="Deskripsi" required />
+    <input type="date" id="date" />
+    <button type="submit">Tambah</button>
+  </form>
+
+  <h2>Ringkasan</h2>
+  <div id="summary">Memuat...</div>
+
+  <h2>Laporan Bulanan</h2>
+  <div id="monthly">Memuat...</div>
+
+  <h2>Riwayat Transaksi</h2>
+  <table id="transactionsTable">
+    <thead><tr><th>Tipe</th><th>Jumlah</th><th>Deskripsi</th><th>Tanggal</th></tr></thead>
+    <tbody id="transactionsBody"></tbody>
+  </table>
+
+  <script>
+    const API = './api';
+
+    async function fetchData() {
+      const [summaryRes, monthlyRes, transRes] = await Promise.all([
+        fetch(`${API}/summary`),
+        fetch(`${API}/monthly`),
+        fetch(`${API}/transactions`)
+      ]);
+
+      const summary = await summaryRes.json();
+      const monthly = await monthlyRes.json();
+      const transactions = await transRes.json();
+
+      document.getElementById('summary').innerHTML = `
+        <p>Pendapatan: Rp${summary.total_income.toLocaleString()}</p>
+        <p>Pengeluaran: Rp${summary.total_expense.toLocaleString()}</p>
+        <p><strong>Laba/Rugi: Rp${summary.net_profit.toLocaleString()}</strong></p>
+      `;
+
+      let monthlyHTML = '<ul>';
+      for (const [month, data] of Object.entries(monthly)) {
+        monthlyHTML += `<li>${month}: Pendapatan Rp${data.income.toLocaleString()}, Pengeluaran Rp${data.expense.toLocaleString()}</li>`;
+      }
+      monthlyHTML += '</ul>';
+      document.getElementById('monthly').innerHTML = monthlyHTML;
+
+      const tbody = document.getElementById('transactionsBody');
+      tbody.innerHTML = '';
+      transactions.forEach(t => {
+        const row = tbody.insertRow();
+        row.innerHTML = `<td>${t.type === 'income' ? 'Pendapatan' : 'Pengeluaran'}</td>
+                         <td>Rp${t.amount.toLocaleString()}</td>
+                         <td>${t.description}</td>
+                         <td>${t.date}</td>`;
+      });
+    }
+
+    document.getElementById('transactionForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const transaction = {
+        type: document.getElementById('type').value,
+        amount: parseFloat(document.getElementById('amount').value),
+        description: document.getElementById('description').value,
+        date: document.getElementById('date').value || new Date().toISOString().split('T')[0]
+      };
+
+      await fetch(`${API}/transaction`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(transaction)
+      });
+
+      document.getElementById('transactionForm').reset();
+      fetchData();
+    });
+
+    fetchData();
+  </script>
+</body>
+  </html>
